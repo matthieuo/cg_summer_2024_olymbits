@@ -3,6 +3,10 @@
 #include <cassert>
 #include <ostream>
 #include <algorithm>
+#include <vector>
+#include <iterator>
+#include <cmath>
+
 
 using namespace std;
 
@@ -29,10 +33,10 @@ std::ostream& operator<<(std::ostream& os, Action action) {
 constexpr std::size_t NP = 3;
 
 
-template <std::size_t N>
-std::array<int, N> rank_numbers(const std::array<int, N>& numbers) {
+template <std::size_t N, typename T>
+std::array<int, N> rank_numbers(const std::array<T, N>& numbers) {
     // Create an array of pairs to store numbers and their original indices
-    std::array<std::pair<int, int>, N> number_indices;
+    std::array<std::pair<T, int>, N> number_indices;
     for (size_t i = 0; i < N; ++i) {
         number_indices[i] = std::make_pair(numbers[i], i);
     }
@@ -101,9 +105,6 @@ public:
 	c.is_finish = true;
 	//std::cout << c.medals[i] << std::endl;
       }
-      
-
-      
     }
 
     
@@ -182,8 +183,130 @@ private:
   bool is_finish;
 };
 
+//------------------------------------ ARCHERY ------
+//------------------------------------ ARCHERY ------
+//------------------------------------ ARCHERY ------
+
+template <std::size_t N>
+class Archery {
+public:
+    Archery(const std::vector<int> gpu, const std::array<std::array<int, 2>, N> cursors)
+      : wind(gpu), cursors(cursors), is_finish(false) ,medals({4,4,4}){}
+
+  Archery()
+    : wind({}), cursors({}), is_finish(false),medals({4,4,4}) {}
+  
+    Archery action(const std::array<Action, N>& actions) const;
+
+  void print_game_state() const {
+    if (is_finish){
+      std::cerr << "FINISH  "<< std::endl;
+    }
+    std::cerr << "Wind " << std::endl;
+    std::copy(wind.begin(), wind.end(), std::ostream_iterator<int>(std::cerr, " "));
+    
+    for (int i = 0; i < N; ++i) {
+      std::cerr << "Joueur " << i + 1 << " : Position ";
+      std::copy(cursors[i].begin(), cursors[i].end(), std::ostream_iterator<int>(std::cerr, " "));
+      cerr << "med" << medals[i];
+      cerr  << std::endl;
+    }
+  }
+
+
+private:
+  std::vector<int> wind; // Supposition que wind est un vector d'entiers
+  std::array<std::array<int, 2>, N> cursors;
+  std::array<int, N> medals; // Medals
+  bool is_finish;
+
+};
+
+template <std::size_t N>
+Archery<N> Archery<N>::action(const std::array<Action, N>& actions) const {
+
+  if (is_finish) {
+    return *this;
+  }
+
+      
+  auto new_cursors = cursors;
+  auto new_wind = wind;
+  for (std::size_t i = 0; i < actions.size(); ++i) {
+    Action a = actions[i];
+    
+    
+    int offset = new_wind[0];
+    
+    int dx = 0;
+    int dy = 0;
+    if (a == Action::DOWN) {
+      dy = offset;
+    } else if (a == Action::LEFT) {
+      dx = -offset;
+    } else if (a == Action::RIGHT) {
+      dx = offset;
+    } else {
+      dy = -offset;
+    }
+    std::array<int, 2>& cursor = new_cursors[i];
+    cursor[0] += dx;
+    cursor[1] += dy;
+    int max_dist = 20;
+    if (cursor[0] > max_dist) {
+      cursor[0] = max_dist;
+    }
+    if (cursor[1] > max_dist) {
+      cursor[1] = max_dist;
+    }
+    if (cursor[0] < -max_dist) {
+      cursor[0] = -max_dist;
+    }
+    if (cursor[1] < -max_dist) {
+      cursor[1] = -max_dist;
+    }
+  }
+
+  new_wind.erase(new_wind.begin());
+
+  auto ret_val = Archery<N>(new_wind, new_cursors);
+  
+  if (new_wind.empty()) {
+    //game finish
+    ret_val.is_finish = true;
+  
+    std::array<double, NP> v;
+    for (int i=0;i<NP;++i) {
+       v[i] = -(std::pow(new_cursors[i][0],2) + std::pow(new_cursors[i][1],2));
+  
+    }
+  
+    auto sorted_array = rank_numbers(v);
+    for (int i=0; i< sorted_array.size(); ++i) {
+	ret_val.medals[i] = sorted_array[i];
+ 
+	//std::cout << c.medals[i] << std::endl;
+      }
+  }
+  
+  return ret_val;
+}
+
+
 
 // ***************************************************
+std::vector<int> string_to_vector(const std::string& str) {
+    std::vector<int> result;
+
+    for (char ch : str) {
+        if (std::isdigit(ch)) {
+            result.push_back(ch - '0');
+        }
+    }
+    
+    return result;
+}
+
 
 int main()
 {
@@ -195,13 +318,16 @@ int main()
     // game loop
 
     int step = 0;
+    Course<NP> c;
+    Archery<NP> ar;
+    
     while (1) {
         for (int i = 0; i < 3; i++) {
             string score_info;
             getline(cin, score_info);
         }
 
-	Course<NP> c;
+
 	
         for (int i = 0; i < nb_games; i++) {
             string gpu;
@@ -216,71 +342,31 @@ int main()
 	    if (step == 0 && i == 0) {
 	      c = Course<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
 	    }
+	    if (step == 0 && i == 1) {
+	      std::array<int, 2> a1 = {reg_0,reg_1};
+	      std::array<int, 2> a2 = {reg_2,reg_3};
+	      std::array<int, 2> a3 = {reg_4,reg_5};
+	      auto in_v=string_to_vector(gpu);
+	      //std::array<std::array<int, 2>, NP> array = { a1, a2,a3 };
+	      ar = Archery<NP>(in_v,{ a1, a2,a3 } );
+	    }
+	    if (i == 1) {
+	      std::cerr << gpu << " " << reg_0 << " " << reg_1 << endl;
+	    }
         }
-	c.print_game_state();
+	//c.print_game_state();
+	//c = c.action({Action::UP,Action::LEFT,Action::LEFT});
+	ar.print_game_state();
+	ar = ar.action({Action::UP,Action::LEFT,Action::LEFT});
         // Write an action using cout. DON'T FORGET THE "<< endl"
         // To debug: cerr << "Debug messages..." << endl;
 
-        cout << "LEFT" << endl;
+        cout << "UP" << endl;
 
 	++step;
     }
 }
 
 
-void main2() {
-  // Exemple d'utilisation
-  std::string gpu = "...#...#...#...#..............";
-  std::array<int, NP> reg = {0, 0, 0};
-  std::array<int, NP> stun = {0, 0, 0};
 
-  Course course(gpu, reg, stun);
-
-  course.print_game_state();
-
-  auto nc = course.action({Action::LEFT,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::DOWN,Action::LEFT,Action::LEFT});
-  nc.print_game_state();
-  nc = nc.action({Action::UP,Action::UP,Action::UP});
-  nc.print_game_state();
-  nc = nc.action({Action::LEFT,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::LEFT,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::DOWN,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-    nc = nc.action({Action::LEFT,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::DOWN,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::UP,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::UP,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-  nc = nc.action({Action::DOWN,Action::RIGHT,Action::RIGHT});
-  nc.print_game_state();
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});  nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});  nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::RIGHT,Action::RIGHT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::LEFT,Action::LEFT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::LEFT,Action::LEFT});
-    nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::LEFT,Action::LEFT});
-      nc.print_game_state();
-  nc = nc.action({Action::RIGHT,Action::LEFT,Action::LEFT});
-    nc.print_game_state();
-
-}
 
