@@ -6,6 +6,8 @@
 #include <vector>
 #include <iterator>
 #include <cmath>
+#include <stdexcept>
+
 
 
 using namespace std;
@@ -74,7 +76,7 @@ public:
     : gpu(""), pos({0,0,0}), diz({0,0,0}), medals({4,4,4}), is_finish(false) {}
 
   // Fonction pour effectuer une action et mettre à jour l'état du jeu
-  Course action(const std::array<Action, 3>& actions) const {
+  Course action(const std::array<Action, N>& actions) const {
 
     if (is_finish) {
       return *this;
@@ -215,7 +217,7 @@ public:
 
 
 private:
-  std::vector<int> wind; // Supposition que wind est un vector d'entiers
+  std::vector<int> wind; 
   std::array<std::array<int, 2>, N> cursors;
   std::array<int, N> medals; // Medals
   bool is_finish;
@@ -293,6 +295,115 @@ Archery<N> Archery<N>::action(const std::array<Action, N>& actions) const {
 }
 
 
+//------------------------------------ DIVING ------
+//------------------------------------ DIVING ------
+//------------------------------------ DIVING ------
+
+template <std::size_t N>
+class Diving {
+public:
+
+    Diving(const std::string& gpu_str, const std::array<int, N>& points, const std::array<int, N>& combos)
+        : points(points), combos(combos), medals({4, 4, 4}), is_finish(false) {
+        // Conversion de la chaîne de caractères en std::vector<Action>
+        for (char c : gpu_str) {
+            switch (c) {
+                case 'U': gpu.push_back(Action::UP); break;
+                case 'L': gpu.push_back(Action::LEFT); break;
+                case 'D': gpu.push_back(Action::DOWN); break;
+                case 'R': gpu.push_back(Action::RIGHT); break;
+                default: throw std::invalid_argument("Invalid character in GPU string");
+            }
+        }
+    }
+
+    Diving()
+        : gpu({}), points({}), combos({}), medals({4, 4, 4}), is_finish(false) {}
+
+    // Fonction pour effectuer une action et mettre à jour l'état du jeu
+    Diving action(const std::array<Action, N>& actions) const {
+        if (is_finish) {
+            return *this;
+        }
+
+        // Créer une copie de l'état actuel
+        Diving new_state = *this;
+        std::vector<Action> new_gpu = new_state.gpu;
+        std::array<int, N> new_points = new_state.points;
+        std::array<int, N> new_combos = new_state.combos;
+
+        // Effectuer les actions
+        for (size_t i = 0; i < actions.size(); ++i) {
+            Action action = actions[i];
+            if (!new_gpu.empty() && new_gpu[0] == action) {
+                new_combos[i]++;
+                new_points[i] += new_combos[i];
+            } else {
+                new_combos[i] = 0;
+            }
+        }
+
+	new_gpu.erase(new_gpu.begin()); // Suppression du premier élément de gpu
+        
+
+        new_state.points = new_points;
+        new_state.combos = new_combos;
+        new_state.gpu = new_gpu;
+
+        if (new_gpu.empty()) {
+	  auto sorted_array = rank_numbers(new_points);
+	  for (int i = 0; i< sorted_array.size(); ++i) {
+	    new_state.medals[i] = sorted_array[i];
+	  }
+	  new_state.is_finish = true;
+        }
+
+        return new_state;
+    }
+
+    // Fonction pour afficher l'état du jeu
+    void print_game_state() const {
+        std::cerr << "GPU: ";
+        for (const auto& action : gpu) {
+            switch (action) {
+                case Action::UP: std::cerr << "UP "; break;
+                case Action::LEFT: std::cerr << "LEFT "; break;
+                case Action::DOWN: std::cerr << "DOWN "; break;
+                case Action::RIGHT: std::cerr << "RIGHT "; break;
+            }
+        }
+        std::cerr << std::endl;
+        std::cerr << "Points: ";
+        for (const auto& point : points) {
+            std::cerr << point << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Combos: ";
+        for (const auto& combo : combos) {
+            std::cerr << combo << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Medals: ";
+        for (const auto& medal : medals) {
+            std::cerr << medal << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Is Finish: " << std::boolalpha << is_finish << std::endl;
+    }
+
+private:
+    // Variables représentant l'état du jeu
+    std::vector<Action> gpu;
+    std::array<int, N> points;
+    std::array<int, N> combos;
+    std::array<int, N> medals; // Medals
+    bool is_finish;
+};
+
+
+
+
+
 
 // ***************************************************
 std::vector<int> string_to_vector(const std::string& str) {
@@ -320,6 +431,8 @@ int main()
     int step = 0;
     Course<NP> c;
     Archery<NP> ar;
+    Diving<NP> div;
+
     
     while (1) {
         for (int i = 0; i < 3; i++) {
@@ -350,14 +463,20 @@ int main()
 	      //std::array<std::array<int, 2>, NP> array = { a1, a2,a3 };
 	      ar = Archery<NP>(in_v,{ a1, a2,a3 } );
 	    }
-	    if (i == 1) {
-	      std::cerr << gpu << " " << reg_0 << " " << reg_1 << endl;
+
+	    if (step == 0 && i == 3) {
+	      div = Diving<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
+	    }
+	    if (i == 3) {
+	      std::cerr << gpu << " " << reg_0 << " " << reg_3 << endl;
 	    }
         }
 	//c.print_game_state();
 	//c = c.action({Action::UP,Action::LEFT,Action::LEFT});
-	ar.print_game_state();
-	ar = ar.action({Action::UP,Action::LEFT,Action::LEFT});
+	//ar.print_game_state();
+	//ar = ar.action({Action::UP,Action::LEFT,Action::LEFT});
+	div.print_game_state();
+	div = div.action({Action::UP,Action::LEFT,Action::LEFT});
         // Write an action using cout. DON'T FORGET THE "<< endl"
         // To debug: cerr << "Debug messages..." << endl;
 
