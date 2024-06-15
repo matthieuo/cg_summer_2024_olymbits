@@ -7,7 +7,8 @@
 #include <iterator>
 #include <cmath>
 #include <stdexcept>
-
+#include <optional>
+#include <random>
 
 
 using namespace std;
@@ -401,6 +402,173 @@ private:
 };
 
 
+//------------------------------------ ROLLER ------
+//------------------------------------ ROLLER ------
+//------------------------------------ ROLLER ------
+
+
+
+Action char_to_action(char c) {
+    switch (c) {
+        case 'U': return Action::UP;
+        case 'L': return Action::LEFT;
+        case 'D': return Action::DOWN;
+        case 'R': return Action::RIGHT;
+        default: throw std::invalid_argument("Invalid character for Action");
+    }
+}
+
+template <std::size_t N>
+class Roller {
+public:
+    // Constructeur initialisant l'état du jeu
+  Roller( const std::string& gpu,const std::array<int, N>& positions, const std::array<int, N>& risk, int timer)
+    : positions(positions), risk(risk), medals({4,4,4}),length(10), timer(timer), is_finish(false) {
+        if (gpu.size() != 4) {
+            throw std::invalid_argument("GPU string must contain exactly 4 characters.");
+        }
+        for (size_t i = 0; i < 4; ++i) {
+            directions[i] = char_to_action(gpu[i]);
+        }
+    }
+
+    Roller()
+        : positions({}), risk({}), medals({4,4,4}), length(0), timer(0), is_finish(false) {
+        directions = {Action::RIGHT, Action::DOWN, Action::LEFT, Action::UP};
+    }
+
+    // Fonction pour effectuer une action et mettre à jour l'état du jeu
+    Roller action(const std::array<Action, N>& actions) const {
+        if (is_finish) {
+            return *this;
+        }
+
+        // Créer une copie de l'état actuel
+        Roller new_state = *this;
+        std::array<int, N> new_positions = new_state.positions;
+        std::array<int, N> new_risk = new_state.risk;
+
+        // Effectuer les actions
+        for (size_t i = 0; i < actions.size(); ++i) {
+            Action action = actions[i];
+
+            if (new_risk[i] < 0) {
+                new_risk[i]++;
+                continue;
+            }
+
+            int idx = std::find(new_state.directions.begin(), new_state.directions.end(), action) - new_state.directions.begin();
+            int dx = idx == 0 ? 1 : (idx == 3 ? 3 : 2);
+
+            new_positions[i] += dx;
+            int riskValue = -1 + idx;
+            new_risk[i] = std::max(0, new_risk[i] + riskValue);
+        }
+
+        // Vérifier les collisions et ajuster le risque
+        for (size_t i = 0; i < new_positions.size(); ++i) {
+            if (new_risk[i] < 0) {
+                continue;
+            }
+
+            bool clash = false;
+            for (size_t k = 0; k < new_positions.size(); ++k) {
+                if (k == i) {
+                    continue;
+                }
+                if (new_positions[k] % new_state.length == new_positions[i] % new_state.length) {
+                    clash = true;
+                    break;
+                }
+            }
+            if (clash) {
+                new_risk[i] += 2;
+            }
+
+            if (new_risk[i] >= 5) {
+                new_risk[i] = -2; // stun
+            }
+        }
+
+        // Décrémenter le timer
+        new_state.timer--;
+
+        // Mettre à jour l'état
+        new_state.positions = new_positions;
+        new_state.risk = new_risk;
+
+        if (new_state.timer == 0) {
+	  auto sorted_array = rank_numbers(new_state.positions);
+	  for (int i = 0; i< sorted_array.size(); ++i) {
+	    new_state.medals[i] = sorted_array[i];
+	  }
+            new_state.is_finish = true;
+        }
+
+        return new_state;
+    }
+
+    // Fonction pour mélanger les directions
+    void shuffle_directions(const std::optional<std::string>& new_gpu = std::nullopt) {
+        if (!new_gpu) {
+            // Mélanger aléatoirement
+            std::random_device rd;
+            std::mt19937 g(rd());
+            std::shuffle(directions.begin(), directions.end(), g);
+        } else {
+            // Mélanger en fonction de new_gpu
+            if (new_gpu->size() != 4) {
+                throw std::invalid_argument("GPU string must contain exactly 4 characters.");
+            }
+            for (size_t i = 0; i < 4; ++i) {
+                directions[i] = char_to_action(new_gpu->at(i));
+            }
+        }
+    }
+
+    // Fonction pour afficher l'état du jeu
+    void print_game_state() const {
+        std::cerr << "Positions: ";
+        for (const auto& pos : positions) {
+            std::cerr << pos << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Risk: ";
+        for (const auto& r : risk) {
+            std::cerr << r << " ";
+        }
+        std::cerr << std::endl;
+        std::cerr << "Timer: " << timer << std::endl;
+        std::cerr << "Is Finish: " << std::boolalpha << is_finish << std::endl;
+        std::cerr << "Directions: ";
+        for (const auto& dir : directions) {
+            switch (dir) {
+                case Action::UP: std::cerr << "UP "; break;
+                case Action::LEFT: std::cerr << "LEFT "; break;
+                case Action::DOWN: std::cerr << "DOWN "; break;
+                case Action::RIGHT: std::cerr << "RIGHT "; break;
+            }
+        }
+
+	std::cerr << "Medals: ";
+        for (const auto& medal : medals) {
+	  std::cerr << medal << " ";
+        }
+        std::cerr << std::endl;
+    }
+
+private:
+  // Variables représentant l'état du jeu
+  std::array<int, N> positions;
+  std::array<int, N> risk;
+  std::array<Action, 4> directions;
+  std::array<int, N> medals; // Medals
+  int length;
+  int timer;
+  bool is_finish;
+};
+
+
 
 
 
@@ -432,7 +600,7 @@ int main()
     Course<NP> c;
     Archery<NP> ar;
     Diving<NP> div;
-
+    Roller<NP> rol;
     
     while (1) {
         for (int i = 0; i < 3; i++) {
@@ -467,16 +635,26 @@ int main()
 	    if (step == 0 && i == 3) {
 	      div = Diving<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
 	    }
-	    if (i == 3) {
-	      std::cerr << gpu << " " << reg_0 << " " << reg_3 << endl;
+	    if (step == 0 && i == 2) {
+	      rol = Roller<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5},reg_6);
+	    }
+	    if (i == 2) {
+	      std::cerr << gpu << " " << reg_0 << " " << reg_3 << " " << reg_6 << endl;
+	      if (gpu != "GAME_OVER") {
+	      rol.shuffle_directions(gpu);
+	      }
 	    }
         }
 	//c.print_game_state();
 	//c = c.action({Action::UP,Action::LEFT,Action::LEFT});
 	//ar.print_game_state();
-	//ar = ar.action({Action::UP,Action::LEFT,Action::LEFT});
-	div.print_game_state();
-	div = div.action({Action::UP,Action::LEFT,Action::LEFT});
+	//div.print_game_state();
+	//div = div.action({Action::UP,Action::LEFT,Action::LEFT});
+	rol.print_game_state();
+	
+	rol = rol.action({Action::UP,Action::UP,Action::UP});
+
+	
         // Write an action using cout. DON'T FORGET THE "<< endl"
         // To debug: cerr << "Debug messages..." << endl;
 
