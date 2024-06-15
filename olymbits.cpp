@@ -3,6 +3,8 @@
 #include <cassert>
 #include <ostream>
 #include <algorithm>
+#include <string>
+#include <tuple>
 #include <vector>
 #include <iterator>
 #include <cmath>
@@ -12,6 +14,7 @@
 
 
 using namespace std;
+typedef tuple<std::string, int, int, int, int, int, int, int> input_tuple;
 
 enum class Action { UP, LEFT, DOWN, RIGHT };
 
@@ -35,6 +38,19 @@ std::ostream& operator<<(std::ostream& os, Action action) {
 
 constexpr std::size_t NP = 3;
 
+
+// ***************************************************
+std::vector<int> string_to_vector(const std::string& str) {
+    std::vector<int> result;
+
+    for (char ch : str) {
+        if (std::isdigit(ch)) {
+            result.push_back(ch - '0');
+        }
+    }
+    
+    return result;
+}
 
 template <std::size_t N, typename T>
 std::array<int, N> rank_numbers(const std::array<T, N>& numbers) {
@@ -65,19 +81,46 @@ std::array<int, N> rank_numbers(const std::array<T, N>& numbers) {
     return ranks;
 }
 
+/*template <std::size_t N>
+class MiniGame {
+public:
+  virtual MiniGame action(const std::array<Action, N>& actions) const = 0;
+  virtual void print_game_state() const =0;
+
+  bool game_finish() const {return is_finish;}
+  
+private:
+
+  bool is_finish;
+  };*/
+
+
+
+//-------------- COURSE ----------------
+//-------------- COURSE ----------------
+//-------------- COURSE ----------------
 
 template <std::size_t N>
 class Course {
 public:
   // Constructeur initialisant l'état du jeu
   Course(const std::string& gpu, const std::array<int, N>& pos, const std::array<int, N>& diz)
-    : gpu(gpu), pos(pos), diz(diz), medals({4,4,4}), is_finish(false) {}
+    : gpu(gpu), pos(pos), diz(diz), medals({4,4,4}) {
+    is_finish = (gpu == "GAME_OVER");
+    if (is_finish) {
+      auto sorted_array = rank_numbers(pos);
+      for (int i = 0; i< sorted_array.size(); ++i) {
+	medals[i] = sorted_array[i];
+      }
+    }
+    }
+    
 
   Course()
     : gpu(""), pos({0,0,0}), diz({0,0,0}), medals({4,4,4}), is_finish(false) {}
 
   // Fonction pour effectuer une action et mettre à jour l'état du jeu
-  Course action(const std::array<Action, N>& actions) const {
+   Course action(const std::array<Action, N>& actions) const {
 
     if (is_finish) {
       return *this;
@@ -193,8 +236,29 @@ private:
 template <std::size_t N>
 class Archery {
 public:
-    Archery(const std::vector<int> gpu, const std::array<std::array<int, 2>, N> cursors)
-      : wind(gpu), cursors(cursors), is_finish(false) ,medals({4,4,4}){}
+    Archery(const std::string gpu, const std::array<std::array<int, 2>, N> cursors)
+      : cursors(cursors) ,medals({4,4,4}){
+
+      if (gpu == "GAME_OVER") {
+	is_finish = true;
+	//compute medals
+	std::array<double, NP> v;
+	for (int i=0;i<NP;++i) {
+	  v[i] = -(std::pow(cursors[i][0],2) + std::pow(cursors[i][1],2));
+  
+	}
+	auto sorted_array = rank_numbers(v);
+	for (int i=0; i< sorted_array.size(); ++i) {
+	  medals[i] = sorted_array[i];
+      }
+	
+      } else {
+	is_finish = false;
+	auto in_v=string_to_vector(gpu);
+	wind = in_v;
+      }
+
+    }
 
   Archery()
     : wind({}), cursors({}), is_finish(false),medals({4,4,4}) {}
@@ -305,7 +369,17 @@ class Diving {
 public:
 
     Diving(const std::string& gpu_str, const std::array<int, N>& points, const std::array<int, N>& combos)
-        : points(points), combos(combos), medals({4, 4, 4}), is_finish(false) {
+        : points(points), combos(combos), medals({4, 4, 4}) {
+
+
+      if (gpu_str == "GAME_OVER") {
+	is_finish = true;
+	auto sorted_array = rank_numbers(points);
+	for (int i = 0; i< sorted_array.size(); ++i) {
+	  medals[i] = sorted_array[i];
+	}
+      } else {
+	is_finish = false;
         // Conversion de la chaîne de caractères en std::vector<Action>
         for (char c : gpu_str) {
             switch (c) {
@@ -316,6 +390,7 @@ public:
                 default: throw std::invalid_argument("Invalid character in GPU string");
             }
         }
+      }
     }
 
     Diving()
@@ -423,14 +498,25 @@ class Roller {
 public:
     // Constructeur initialisant l'état du jeu
   Roller( const std::string& gpu,const std::array<int, N>& positions, const std::array<int, N>& risk, int timer)
-    : positions(positions), risk(risk), medals({4,4,4}),length(10), timer(timer), is_finish(false) {
-        if (gpu.size() != 4) {
-            throw std::invalid_argument("GPU string must contain exactly 4 characters.");
-        }
-        for (size_t i = 0; i < 4; ++i) {
-            directions[i] = char_to_action(gpu[i]);
-        }
+    : positions(positions), risk(risk), medals({4,4,4}),length(10), timer(timer) {
+
+
+    if (gpu == "GAME_OVER") {
+      is_finish = true;
+      auto sorted_array = rank_numbers(positions);
+      for (int i = 0; i< sorted_array.size(); ++i) {
+	medals[i] = sorted_array[i];
+      }
+    } else {
+      is_finish = false;
+      if (gpu.size() != 4) {
+	throw std::invalid_argument("GPU string must contain exactly 4 characters.");
+      }
+      for (size_t i = 0; i < 4; ++i) {
+	directions[i] = char_to_action(gpu[i]);
+      }
     }
+  }
 
     Roller()
         : positions({}), risk({}), medals({4,4,4}), length(0), timer(0), is_finish(false) {
@@ -573,20 +659,71 @@ private:
 
 
 
-// ***************************************************
-std::vector<int> string_to_vector(const std::string& str) {
-    std::vector<int> result;
 
-    for (char ch : str) {
-        if (std::isdigit(ch)) {
-            result.push_back(ch - '0');
-        }
-    }
+//*********
+
+
     
-    return result;
+template <std::size_t N>
+class FullGame {
+public:
+
+  
+  
+  FullGame(input_tuple cou, input_tuple arr, input_tuple rol, input_tuple div ) {
+    {
+      auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = cou;
+      co = Course<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
+    }
+    {
+      auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = arr;
+      std::array<int, 2> a1 = {reg_0,reg_1};
+      std::array<int, 2> a2 = {reg_2,reg_3};
+      std::array<int, 2> a3 = {reg_4,reg_5};
+      ar = Archery<N>(gpu,{ a1, a2,a3 } );
+    }
+    {
+      auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5, reg_6] = rol;
+      ro = Roller<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5},reg_6);
+    }
+    {
+      auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = div;
+      di = Diving<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
+    }
+  }
+  FullGame action(const std::array<Action, N>& actions) const;
+
+  void print_game_state() const {
+    co.print_game_state();
+    ar.print_game_state();
+    ro.print_game_state();
+    di.print_game_state();
+  }
+private:
+  Course<N> co;
+  Archery<N> ar;
+  Roller<N> ro;
+  Diving<N> di;
+  
+};
+
+template <std::size_t N>
+FullGame<N> FullGame<N>::action(const std::array<Action, N>& actions) const {
+  auto nco = co.action(actions);
+  auto nar = ar.action(actions);
+  auto nro = ro.action(actions);
+  auto ndi = di.action(actions);
+
+  FullGame fg;
+  fg.co = nco;
+  fg.ar = nar;
+  fg.ro = nro;
+  fg.di = ndi;
+
+  return fg;
+  
 }
-
-
+  
 int main()
 {
     int player_idx;
@@ -597,10 +734,10 @@ int main()
     // game loop
 
     int step = 0;
-    Course<NP> c;
+    /*Course<NP> c;
     Archery<NP> ar;
     Diving<NP> div;
-    Roller<NP> rol;
+    Roller<NP> rol;*/
     
     while (1) {
         for (int i = 0; i < 3; i++) {
@@ -609,7 +746,7 @@ int main()
         }
 
 
-	
+	vector<input_tuple> vit;
         for (int i = 0; i < nb_games; i++) {
             string gpu;
             int reg_0;
@@ -620,16 +757,17 @@ int main()
             int reg_5;
             int reg_6;
             cin >> gpu >> reg_0 >> reg_1 >> reg_2 >> reg_3 >> reg_4 >> reg_5 >> reg_6; cin.ignore();
-	    if (step == 0 && i == 0) {
+	    vit.push_back(make_tuple(gpu,reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6));
+	    /*    if (step == 0 && i == 0) {
 	      c = Course<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
 	    }
 	    if (step == 0 && i == 1) {
 	      std::array<int, 2> a1 = {reg_0,reg_1};
 	      std::array<int, 2> a2 = {reg_2,reg_3};
 	      std::array<int, 2> a3 = {reg_4,reg_5};
-	      auto in_v=string_to_vector(gpu);
+	      //auto in_v=string_to_vector(gpu);
 	      //std::array<std::array<int, 2>, NP> array = { a1, a2,a3 };
-	      ar = Archery<NP>(in_v,{ a1, a2,a3 } );
+	      ar = Archery<NP>(gpu,{ a1, a2,a3 } );
 	    }
 
 	    if (step == 0 && i == 3) {
@@ -643,16 +781,18 @@ int main()
 	      if (gpu != "GAME_OVER") {
 	      rol.shuffle_directions(gpu);
 	      }
-	    }
+	      }*/
         }
+	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3]);
+	fg.print_game_state();
 	//c.print_game_state();
 	//c = c.action({Action::UP,Action::LEFT,Action::LEFT});
 	//ar.print_game_state();
 	//div.print_game_state();
 	//div = div.action({Action::UP,Action::LEFT,Action::LEFT});
-	rol.print_game_state();
+	//rol.print_game_state();
 	
-	rol = rol.action({Action::UP,Action::UP,Action::UP});
+	//rol = rol.action({Action::UP,Action::UP,Action::UP});
 
 	
         // Write an action using cout. DON'T FORGET THE "<< endl"
