@@ -1,3 +1,9 @@
+#pragma GCC optimize("-Ofast")
+#pragma GCC optimize("inline")
+#pragma GCC optimize("omit-frame-pointer")
+#pragma GCC optimize("unroll-loops")
+#pragma GCC optimize("tree-vectorize")
+#pragma GCC optimize("fast-math")
 #include <iostream>
 #include <array>
 #include <cassert>
@@ -11,6 +17,8 @@
 #include <stdexcept>
 #include <optional>
 #include <random>
+#include <memory>
+#include <chrono>
 
 
 using namespace std;
@@ -40,6 +48,19 @@ constexpr std::size_t NP = 3;
 
 
 // ***************************************************
+std::vector<std::array<Action, 3>> generate_combinations() {
+    std::vector<std::array<Action, 3>> combinations;
+    for (auto a1 : {Action::UP, Action::DOWN, Action::LEFT, Action::RIGHT}) {
+        for (auto a2 : {Action::UP, Action::DOWN, Action::LEFT, Action::RIGHT}) {
+            for (auto a3 : {Action::UP, Action::DOWN, Action::LEFT, Action::RIGHT}) {
+                combinations.push_back({a1, a2, a3});
+            }
+        }
+    }
+    return combinations;
+}
+
+
 std::vector<int> string_to_vector(const std::string& str) {
     std::vector<int> result;
 
@@ -104,14 +125,24 @@ template <std::size_t N>
 class Course {
 public:
   // Constructeur initialisant l'état du jeu
-  Course(const std::string& gpu, const std::array<int, N>& pos, const std::array<int, N>& diz)
-    : gpu(gpu), pos(pos), diz(diz), medals({4,4,4}) {
-    is_finish = (gpu == "GAME_OVER");
+  Course(const std::string& gpu_, const std::array<int, N>& pos, const std::array<int, N>& diz)
+    :  pos(pos), diz(diz), medals({4,4,4}) {
+
+
+    
+    is_finish = (gpu_ == "GAME_OVER");
     if (is_finish) {
       auto sorted_array = rank_numbers(pos);
       for (int i = 0; i< sorted_array.size(); ++i) {
 	medals[i] = sorted_array[i];
       }
+    } else {
+      cerr << gpu_ << gpu_.length() << endl;
+      assert(gpu_.length() == 30);
+
+      for (int i=0;i<gpu_.length();++i) {
+	gpu[i] = gpu_[i];
+    }
     }
     }
     
@@ -119,6 +150,11 @@ public:
   Course()
     : gpu(""), pos({0,0,0}), diz({0,0,0}), medals({4,4,4}), is_finish(false) {}
 
+    bool game_finish() const {
+    return is_finish;
+  }
+
+  std::array<int, N> get_medals() const {return medals;}
   // Fonction pour effectuer une action et mettre à jour l'état du jeu
    Course action(const std::array<Action, N>& actions) const {
 
@@ -136,13 +172,16 @@ public:
       auto [x,y] = update_agent_pos_diz(pos[i], diz[i], actions[i]);
       new_pos[i] = x;
       new_diz[i] = y;
-      if (x == gpu.size() - 1) {
+      if (x == 30-1) {//gpu.size() - 1) {
 	is_game_finish = true;
       }
       //std::cout << x << "," << y << std::endl;
     }
 
-    auto c =  Course(gpu, new_pos, new_diz);
+    auto c =  *this; //Course();//gpu, new_pos, new_diz);
+ 
+    c.pos = new_pos;
+    c.diz = new_diz;
     //std::cout << new_pos << std::endl;
     if (is_game_finish) {
       auto sorted_array = rank_numbers(new_pos);
@@ -196,7 +235,7 @@ private:
       break;
     }
 
-    target_pos = std::min(target_pos, (int)gpu.size()-1);
+    target_pos = std::min(target_pos, 30-1);//(int)gpu.size()-1);
 
     //std::cout << init_pos << " " << target_pos << std::endl;
 
@@ -220,7 +259,7 @@ private:
 
 
   // Variables représentant l'état du jeu
-  std::string gpu;
+  char gpu[30];
   std::array<int, N> pos; // Positions des agents
   std::array<int, N> diz; // Décomptes d'étourdissement des agents
 
@@ -261,10 +300,14 @@ public:
     }
 
   Archery()
-    : wind({}), cursors({}), is_finish(false),medals({4,4,4}) {}
+    : wind({}), cursors({}),medals({4,4,4}), is_finish(false) {}
   
     Archery action(const std::array<Action, N>& actions) const;
 
+    bool game_finish() const {
+    return is_finish;
+  }
+  
   void print_game_state() const {
     if (is_finish){
       std::cerr << "FINISH  "<< std::endl;
@@ -280,7 +323,7 @@ public:
     }
   }
 
-
+  std::array<int, N> get_medals() const {return medals;}
 private:
   std::vector<int> wind; 
   std::array<std::array<int, 2>, N> cursors;
@@ -336,7 +379,9 @@ Archery<N> Archery<N>::action(const std::array<Action, N>& actions) const {
 
   new_wind.erase(new_wind.begin());
 
-  auto ret_val = Archery<N>(new_wind, new_cursors);
+  auto ret_val = *this; //Archery<N>(new_wind, new_cursors);
+  ret_val.wind = new_wind;
+  ret_val.cursors = new_cursors;
   
   if (new_wind.empty()) {
     //game finish
@@ -396,6 +441,11 @@ public:
     Diving()
         : gpu({}), points({}), combos({}), medals({4, 4, 4}), is_finish(false) {}
 
+    bool game_finish() const {
+    return is_finish;
+  }
+  std::array<int, N> get_medals() const {return medals;}
+  
     // Fonction pour effectuer une action et mettre à jour l'état du jeu
     Diving action(const std::array<Action, N>& actions) const {
         if (is_finish) {
@@ -523,6 +573,10 @@ public:
         directions = {Action::RIGHT, Action::DOWN, Action::LEFT, Action::UP};
     }
 
+  bool game_finish() const {
+    return is_finish;
+  }
+  std::array<int, N> get_medals() const {return medals;}
     // Fonction pour effectuer une action et mettre à jour l'état du jeu
     Roller action(const std::array<Action, N>& actions) const {
         if (is_finish) {
@@ -668,9 +722,10 @@ template <std::size_t N>
 class FullGame {
 public:
 
-  
-  
-  FullGame(input_tuple cou, input_tuple arr, input_tuple rol, input_tuple div ) {
+
+
+  FullGame(input_tuple cou, input_tuple arr, input_tuple rol, input_tuple div, const std::vector<std::array<Action,NP>>& poss_actions )
+    :poss_actions(poss_actions){
     {
       auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = cou;
       co = Course<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
@@ -691,7 +746,18 @@ public:
       di = Diving<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
     }
   }
+
+  
   FullGame action(const std::array<Action, N>& actions) const;
+  FullGame random_action() const;
+  FullGame random_play_until_end() const;
+  const std::array<float, N> players_stats() const;
+
+  
+  bool is_all_finish() const {
+    return co.game_finish() && ar.game_finish() && ro.game_finish() && di.game_finish();
+  }
+  
 
   void print_game_state() const {
     co.print_game_state();
@@ -699,14 +765,114 @@ public:
     ro.print_game_state();
     di.print_game_state();
   }
+  std::vector<std::array<Action,N>> poss_actions;
+  
 private:
+  
+  std::array<Action, 3> select_random_combination() const;
+  
+  
   Course<N> co;
   Archery<N> ar;
   Roller<N> ro;
   Diving<N> di;
-  
 };
 
+template <std::size_t N>
+const std::array<float, N> FullGame<N>:: players_stats() const{
+  std::array<std::array<float, N>,4> ret_ar = {};
+  std::array<float, N> ret_ar_final = {};
+   auto mc = co.get_medals();
+  auto ma = ar.get_medals();
+  auto mr = ro.get_medals();
+  auto md = di.get_medals();
+
+
+
+  for (int i = 0; i< N; ++i) {
+    if (mc[i] == 1) {ret_ar[0][i] += 3;}
+    else if (mc[i] == 2) {ret_ar[0][i] += 1;}
+    else if (mc[i] == 3) {ret_ar[0][i] += 0;}
+    else {cerr << "HEE mc " << mc[i] << endl;}
+    
+    if (ma[i] == 1) {ret_ar[1][i] += 3;}
+    else if (ma[i] == 2) {ret_ar[1][i] += 1;}
+    else if (ma[i] == 3) {ret_ar[1][i] += 0;}
+    else {cerr << "HEE ma " << ma[i] << endl;}
+	
+    if (mr[i] == 1) {ret_ar[2][i] += 3;}
+    else if (mr[i] == 2) {ret_ar[2][i] += 1;}
+    else if (mr[i] == 3) {ret_ar[2][i] += 0;}
+    else {cerr << "HEE mr " << mr[i] << endl;}
+	    
+    if (md[i] == 1) {ret_ar[3][i] += 3;}
+    else if (md[i] == 2) {ret_ar[3][i] += 1;}
+    else if (md[i] == 3) {ret_ar[3][i] += 0;}
+    else {cerr << "HEE md " << md[i] << endl;}
+  }
+
+  for (int j=0;j<N;++j) {
+    float mult = 1.0;
+    for (int i = 0; i< 4; ++i) {
+      mult *= ret_ar[i][j];
+    }
+    ret_ar_final[j] = mult;
+    
+  }
+  
+  /*   for (int i = 0; i< N; ++i) {
+    if (mc[i] == 1) {ret_ar[i] += 1;}
+    else if (mc[i] == 2) {ret_ar[i] += 0.5;}
+    else if (mc[i] == 3) {ret_ar[i] += 0;}
+    else {cerr << "HEE mc " << mc[i] << endl;}
+    
+    if (ma[i] == 1) {ret_ar[i] += 1;}
+    else if (ma[i] == 2) {ret_ar[i] += 0.5;}
+    else if (ma[i] == 3) {ret_ar[i] += 0;}
+    else {cerr << "HEE ma " << ma[i] << endl;}
+	
+    if (mr[i] == 1) {ret_ar[i] += 1;}
+    else if (mr[i] == 2) {ret_ar[i] += 0.5;}
+    else if (mr[i] == 3) {ret_ar[i] += 0;}
+    else {cerr << "HEE mr " << mr[i] << endl;}
+	    
+    if (md[i] == 1) {ret_ar[i] += 1;}
+    else if (md[i] == 2) {ret_ar[i] += 0.5;}
+    else if (md[i] == 3) {ret_ar[i] += 0;}
+    else {cerr << "HEE md " << md[i] << endl;}
+    }*/
+
+  return ret_ar_final;
+}
+
+
+template <std::size_t N>
+FullGame<N> FullGame<N>::random_play_until_end() const{
+  //play random action
+  FullGame<N> curr_game = *this;
+
+  while (!curr_game.is_all_finish()) {
+    curr_game = curr_game.random_action();
+    }
+
+  return curr_game;
+}
+
+
+template <std::size_t N>
+std::array<Action, 3> FullGame<N>::select_random_combination() const{
+  // Générateur de nombres aléatoires statique pour éviter la réinitialisation
+  static std::random_device rd;
+  static std::mt19937 gen(rd());
+  std::uniform_int_distribution<> dis(0, poss_actions.size() - 1);
+
+  int random_index = dis(gen);
+  return  poss_actions[random_index];
+}
+
+
+
+  
 template <std::size_t N>
 FullGame<N> FullGame<N>::action(const std::array<Action, N>& actions) const {
   auto nco = co.action(actions);
@@ -714,18 +880,162 @@ FullGame<N> FullGame<N>::action(const std::array<Action, N>& actions) const {
   auto nro = ro.action(actions);
   auto ndi = di.action(actions);
 
-  FullGame fg;
+  FullGame fg = *this;
   fg.co = nco;
   fg.ar = nar;
   fg.ro = nro;
   fg.di = ndi;
 
   return fg;
-  
 }
+template <std::size_t N>
+FullGame<N> FullGame<N>::random_action() const {
+  auto sel_a = select_random_combination();
+  return action(sel_a);
+}
+
+
+
+
+
+// =================== MCTS ==================
+template <std::size_t N>
+struct Node {
+  std::array<float, N> rewards;
+  int n_sims;
+  FullGame<N> game;
+  const int n_moves = 4*4*4;
+  Node* parent;
+  std::vector<std::unique_ptr<Node>> children;
+
+  Node(const Node &) = delete;
+  Node(const FullGame<N>& game);
+  Node(const FullGame<N>& game, Node* parent, const std::array<Action, N>& actions);
+};
+
+
+template <std::size_t N>
+Node<N>::Node(const FullGame<N>& game) :
+  rewards({}), n_sims(0), game(game), parent(nullptr) 
+{
+    children.reserve(n_moves);
+}
+
+template <std::size_t N>
+Node<N>::Node(const FullGame<N>& game, Node* parent, const std::array<Action, N>& actions) :
+  rewards({}), n_sims(0), game(game),parent(parent) 
+{
+  this->game = game.action(actions);
+  children.reserve(n_moves);
+}
+
+
+
+
+// MCTS move
+template <std::size_t N>
+Node<N> * select_and_expand(Node<N>* root) {
+    Node<N>* n = root;
+    while (true) {
+        // return node if game terminated
+        if (n->game.is_all_finish())
+            return n;
+        // expand if new child found
+        const int k = n->children.size();
+        if (k < n->n_moves) {
+	  n->children.push_back(std::make_unique<Node<N>>(n->game, n, n->game.poss_actions[k]));
+            return n->children.back().get();
+        }
+        // select child node using UCB
+        //n =    n->children[0].get();
+	n = select_ucb(n);
+    }
+}
+
+template <std::size_t N>
+void backpropagate(Node<N>* node, std::array<float, N>& status) {
+    Node<N>* n = node;
+    while (n) {
+      for (size_t i = 0; i < N; ++i) {
+        n->rewards[i] += status[i];
+      }
+      //n->_reward += computeScore(status, n->_player);
+      n->n_sims += 1;
+      n = n->parent;
+    }
+}
+
+
+inline float ucb1(float cReward, float cNsims, int pNsims) {
+  //return 0.0;
+  //assert (cNsims > 0);
+  const float exploitation = cReward / cNsims;
+  const float exploration = std::sqrt(std::log(1 + pNsims) / cNsims);
+  //const float exploration = 1.1;
+  //const float KUCT=1.4;
+  //return exploitation + 1.4*exploration;
+  return exploitation + 1.0*exploration;
+}
+
+template <std::size_t N>
+Node<N>* select_ucb(const Node<N>* n) {
+  
+    int best_i = -1;
+    float best_score = -1.0;
+    for (int i=0; i<n->n_moves; i++) {
+        const auto &c = n->children[i];
+        const float s = ucb1(c->rewards[0], c->n_sims, n->n_sims);
+        if (s > best_score) {
+            best_score = s;
+            best_i = i;
+        }
+    }
+    //assert(best_i > -1);
+    return n->children[best_i].get();
+}
+
+template <std::size_t N>
+std::array<Action, N> best_node(const Node<N>& root) {
+    const auto & cs = root.children;
+    auto cmp = [](const std::unique_ptr<Node<N>> & n1, const std::unique_ptr<Node<N>> & n2)
+        { return n1->n_sims < n2->n_sims; };
+    auto iter = std::max_element(cs.begin(), cs.end(), cmp);
+    auto idx = std::distance(cs.begin(), iter);
+    return root.game.poss_actions[idx];
+}
+
+template <std::size_t N>
+std::array<Action, N> get_best_move(const FullGame<N>& game) {
+  Node root(game);
+  auto duration = std::chrono::milliseconds(40);
+  auto start = std::chrono::steady_clock::now();
+
+  int nb_it = 0;
+  while (true) {
+    Node<N>* node = select_and_expand(&root);
+    std::array<float, N> status = node->game.random_play_until_end().players_stats();
+    backpropagate(node, status);
+
+    ++nb_it;
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
+    if (elapsed >= duration) {
+      cerr << "Break at " << elapsed.count() << " " << nb_it << endl;
+      break;
+    }
+  }
+  return best_node(root);
+}
+
+
+
   
 int main()
 {
+
+  const std::vector<std::array<Action,NP>> all_actions_players = generate_combinations();
+
+  
     int player_idx;
     cin >> player_idx; cin.ignore();
     int nb_games;
@@ -757,6 +1067,8 @@ int main()
             int reg_5;
             int reg_6;
             cin >> gpu >> reg_0 >> reg_1 >> reg_2 >> reg_3 >> reg_4 >> reg_5 >> reg_6; cin.ignore();
+
+	    cerr << gpu << " " << reg_0 << " " << reg_1 << " " << reg_2<< " " << reg_3<< " " << reg_4<< " " << reg_5<< " " << reg_6 << endl;
 	    vit.push_back(make_tuple(gpu,reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6));
 	    /*    if (step == 0 && i == 0) {
 	      c = Course<NP>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
@@ -783,8 +1095,23 @@ int main()
 	      }
 	      }*/
         }
-	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3]);
-	fg.print_game_state();
+	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3], all_actions_players );
+	// fg.print_game_state();
+	// cerr << "===========" << endl;
+	// auto tmp =  fg.random_play_until_end();
+	// cerr << tmp.is_all_finish() << endl;
+	// tmp.print_game_state();
+	// for (auto i:tmp.players_stats()) {
+	//   cerr << i << endl;
+	// }
+
+	//for (int i =0;i<100;++i) {
+	  auto bm = get_best_move<NP>(fg);
+	  cout << bm[player_idx] << endl;
+	  //}
+	//for (auto i:bm){
+	//   cerr << "AC" << i << endl;
+	//     }
 	//c.print_game_state();
 	//c = c.action({Action::UP,Action::LEFT,Action::LEFT});
 	//ar.print_game_state();
@@ -798,9 +1125,10 @@ int main()
         // Write an action using cout. DON'T FORGET THE "<< endl"
         // To debug: cerr << "Debug messages..." << endl;
 
-        cout << "UP" << endl;
+     
 
 	++step;
+	//break;
     }
 }
 
