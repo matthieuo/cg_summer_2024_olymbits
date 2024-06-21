@@ -19,6 +19,7 @@
 #include <random>
 #include <memory>
 #include <chrono>
+#include <sstream>
 
 
 using namespace std;
@@ -208,6 +209,45 @@ public:
     }
   }
 
+
+   float eval_func(int play_idx) const {
+
+    float max_other_pos = -10;
+    
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if (pos[i] > max_other_pos) {
+	max_other_pos = pos[i];
+      }
+    }
+
+    float sec_max_other_pos = max_other_pos;
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if (pos[i] < max_other_pos) {
+	sec_max_other_pos = pos[i];
+      }
+    }
+
+    float ret_val;
+    /* if ((float)pos[play_idx] - max_other_pos >= 0) {
+      ret_val = (float)pos[play_idx] - max_other_pos - (float)diz[play_idx]/3.0;
+    }
+    else {
+      ret_val = (float)pos[play_idx] - sec_max_other_pos - (float)diz[play_idx]/3.0;
+      }*/
+    ret_val = (float)pos[play_idx] - max_other_pos +  (float)pos[play_idx] - sec_max_other_pos - (float)diz[play_idx]/3.0;
+
+    return 100.0+ret_val;
+    
+    
+    
+  }
+
 private:
   // Fonction pour mettre à jour la position d'un agent apres un move
   std::tuple<int,int> update_agent_pos_diz(int init_pos, int init_diz, Action action) const {
@@ -304,6 +344,7 @@ public:
   
     Archery action(const std::array<Action, N>& actions) const;
 
+  
     bool game_finish() const {
     return is_finish;
   }
@@ -321,6 +362,21 @@ public:
       cerr << "med" << medals[i];
       cerr  << std::endl;
     }
+  }
+  float eval_func(int play_idx) const {
+    float min_other_pos = 10000;
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if ((std::pow(cursors[i][0],2) + std::pow(cursors[i][1],2)) < min_other_pos) {
+	min_other_pos = (std::pow(cursors[i][0],2) + std::pow(cursors[i][1],2));
+      }
+    }
+    float ret_val = (float)(min_other_pos) - (float)(std::pow(cursors[play_idx][0],2) + std::pow(cursors[play_idx][1],2));
+
+    return (1.0/((float)wind.size() +1)) *( 100.0 + ret_val);
+    
   }
 
   std::array<int, N> get_medals() const {return medals;}
@@ -517,6 +573,33 @@ public:
         std::cerr << "Is Finish: " << std::boolalpha << is_finish << std::endl;
     }
 
+  float eval_func(int play_idx) const {
+    float max_other_point = -10;
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if (points[i] > max_other_point) {
+	max_other_point = points[i];
+      }
+    }
+
+    float max_other_combo = -10;
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if (combos[i] > max_other_combo) {
+	max_other_combo = combos[i];
+      }
+    }
+
+    float ret_val = (float)points[play_idx] - max_other_point +  (float)combos[play_idx] - max_other_combo; 
+
+    return 100.0+ret_val;
+    
+  }
+
 private:
     // Variables représentant l'état du jeu
     std::vector<Action> gpu;
@@ -644,7 +727,7 @@ public:
 	  }
             new_state.is_finish = true;
         }
-
+	new_state.is_finish = true;
         return new_state;
     }
 
@@ -697,6 +780,25 @@ public:
         std::cerr << std::endl;
     }
 
+
+  float eval_func(int play_idx) const {
+    float max_other_pos = -10;
+
+    for (int i=0;i<N;++i) {
+      if (i == play_idx) {
+	continue;
+      }
+      if (positions[i] > max_other_pos) {
+	max_other_pos = positions[i];
+      }
+    }
+
+    float ret_val = (float)positions[play_idx] - max_other_pos;
+
+    return 100.0 + ret_val;
+    
+  }
+
 private:
   // Variables représentant l'état du jeu
   std::array<int, N> positions;
@@ -724,7 +826,7 @@ public:
 
 
 
-  FullGame(input_tuple cou, input_tuple arr, input_tuple rol, input_tuple div, const std::vector<std::array<Action,NP>>& poss_actions )
+  FullGame(input_tuple cou, input_tuple arr, input_tuple rol, input_tuple div, const std::vector<std::vector<int>> &real_s, const std::vector<std::array<Action,NP>>& poss_actions )
     :poss_actions(poss_actions){
     {
       auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = cou;
@@ -745,6 +847,12 @@ public:
       auto [gpu, reg_0,reg_1,reg_2,reg_3,reg_4,reg_5,reg_6] = div;
       di = Diving<N>(gpu, {reg_0,reg_1,reg_2},{reg_3,reg_4,reg_5});
     }
+
+    for (int i=0;i<N;++i) {
+      for(int j=0;j<13;++j) {
+	real_scores[i][j] = real_s[i][j];
+      }
+    }
   }
 
   
@@ -755,7 +863,7 @@ public:
 
   
   bool is_all_finish() const {
-    return co.game_finish() && ar.game_finish() && ro.game_finish() && di.game_finish();
+    return co.game_finish();// && ar.game_finish() && ro.game_finish() && di.game_finish();
   }
   
 
@@ -766,17 +874,51 @@ public:
     di.print_game_state();
   }
   std::vector<std::array<Action,N>> poss_actions;
-  
+
+
+  float eval_func(int player_idx) const;
 private:
   
   std::array<Action, 3> select_random_combination() const;
   
+  std::array<std::array<int, 13>, N> real_scores;
   
   Course<N> co;
   Archery<N> ar;
   Roller<N> ro;
   Diving<N> di;
 };
+
+
+template <std::size_t N>
+float FullGame<N>::eval_func(int player_idx) const{
+  //return co.eval_func(player_idx);
+  //return ar.eval_func(player_idx);
+  //  return di.eval_func(player_idx);
+  //return ro.eval_func(player_idx);
+
+  if ((real_scores[player_idx][10] == 0) && (real_scores[player_idx][11] == 0)) {
+    return di.eval_func(player_idx);
+  }
+
+  else if ((real_scores[player_idx][1] == 0) && (real_scores[player_idx][2] == 0)) {
+    return co.eval_func(player_idx);
+  }
+  
+  else if ((real_scores[player_idx][4] == 0) && (real_scores[player_idx][5] == 0)) {
+    return ar.eval_func(player_idx);
+  }
+  
+  else if ((real_scores[player_idx][7] == 0) && (real_scores[player_idx][8] == 0)) {
+    return ro.eval_func(player_idx);
+  }
+
+  
+  else {
+    
+    return ro.eval_func(player_idx) + co.eval_func(player_idx) + ar.eval_func(player_idx);
+  }
+}
 
 template <std::size_t N>
 const std::array<float, N> FullGame<N>:: players_stats() const{
@@ -795,7 +937,7 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
     else if (mc[i] == 3) {ret_ar[0][i] += 0;}
     else {cerr << "HEE mc " << mc[i] << endl;}
     
-    if (ma[i] == 1) {ret_ar[1][i] += 3;}
+    /* if (ma[i] == 1) {ret_ar[1][i] += 3;}
     else if (ma[i] == 2) {ret_ar[1][i] += 1;}
     else if (ma[i] == 3) {ret_ar[1][i] += 0;}
     else {cerr << "HEE ma " << ma[i] << endl;}
@@ -808,7 +950,7 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
     if (md[i] == 1) {ret_ar[3][i] += 3;}
     else if (md[i] == 2) {ret_ar[3][i] += 1;}
     else if (md[i] == 3) {ret_ar[3][i] += 0;}
-    else {cerr << "HEE md " << md[i] << endl;}
+    else {cerr << "HEE md " << md[i] << endl;}*/
   }
 
   for (int j=0;j<N;++j) {
@@ -842,7 +984,8 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
     else {cerr << "HEE md " << md[i] << endl;}
     }*/
 
-  return ret_ar_final;
+  //return ret_ar_final;
+  return ret_ar[0];
 }
 
 
@@ -851,9 +994,14 @@ FullGame<N> FullGame<N>::random_play_until_end() const{
   //play random action
   FullGame<N> curr_game = *this;
 
-  while (!curr_game.is_all_finish()) {
+  /*while (!curr_game.is_all_finish()) {
     curr_game = curr_game.random_action();
-    }
+    }*/
+
+  for (int i=0;i<3;++i) {
+    curr_game = curr_game.random_action();
+  }
+
 
   return curr_game;
 }
@@ -901,7 +1049,7 @@ FullGame<N> FullGame<N>::random_action() const {
 // =================== MCTS ==================
 template <std::size_t N>
 struct Node {
-  std::array<float, N> rewards;
+  float rewards;
   int n_sims;
   FullGame<N> game;
   const int n_moves = 4*4*4;
@@ -916,14 +1064,14 @@ struct Node {
 
 template <std::size_t N>
 Node<N>::Node(const FullGame<N>& game) :
-  rewards({}), n_sims(0), game(game), parent(nullptr) 
+  rewards(0), n_sims(0), game(game), parent(nullptr) 
 {
     children.reserve(n_moves);
 }
 
 template <std::size_t N>
 Node<N>::Node(const FullGame<N>& game, Node* parent, const std::array<Action, N>& actions) :
-  rewards({}), n_sims(0), game(game),parent(parent) 
+  rewards(0), n_sims(0), game(game),parent(parent) 
 {
   this->game = game.action(actions);
   children.reserve(n_moves);
@@ -953,12 +1101,13 @@ Node<N> * select_and_expand(Node<N>* root) {
 }
 
 template <std::size_t N>
-void backpropagate(Node<N>* node, std::array<float, N>& status) {
+// void backpropagate(Node<N>* node, std::array<float, N>& status) {
+void backpropagate(Node<N>* node, float eval_val) {
     Node<N>* n = node;
     while (n) {
-      for (size_t i = 0; i < N; ++i) {
-        n->rewards[i] += status[i];
-      }
+      //for (size_t i = 0; i < N; ++i) {
+        n->rewards += eval_val;
+	//}
       //n->_reward += computeScore(status, n->_player);
       n->n_sims += 1;
       n = n->parent;
@@ -968,13 +1117,14 @@ void backpropagate(Node<N>* node, std::array<float, N>& status) {
 
 inline float ucb1(float cReward, float cNsims, int pNsims) {
   //return 0.0;
-  //assert (cNsims > 0);
+  // assert (cNsims > 0);
+
   const float exploitation = cReward / cNsims;
   const float exploration = std::sqrt(std::log(1 + pNsims) / cNsims);
   //const float exploration = 1.1;
   //const float KUCT=1.4;
   //return exploitation + 1.4*exploration;
-  return exploitation + 1.0*exploration;
+  return exploitation + 1.2*exploration;
 }
 
 template <std::size_t N>
@@ -984,7 +1134,7 @@ Node<N>* select_ucb(const Node<N>* n) {
     float best_score = -1.0;
     for (int i=0; i<n->n_moves; i++) {
         const auto &c = n->children[i];
-        const float s = ucb1(c->rewards[0], c->n_sims, n->n_sims);
+        const float s = ucb1(c->rewards, c->n_sims, n->n_sims);
         if (s > best_score) {
             best_score = s;
             best_i = i;
@@ -996,24 +1146,47 @@ Node<N>* select_ucb(const Node<N>* n) {
 
 template <std::size_t N>
 std::array<Action, N> best_node(const Node<N>& root) {
+  cerr << "here0 "<< endl;
     const auto & cs = root.children;
     auto cmp = [](const std::unique_ptr<Node<N>> & n1, const std::unique_ptr<Node<N>> & n2)
         { return n1->n_sims < n2->n_sims; };
     auto iter = std::max_element(cs.begin(), cs.end(), cmp);
     auto idx = std::distance(cs.begin(), iter);
+    cerr << "here "<< idx <<  endl;
     return root.game.poss_actions[idx];
 }
 
 template <std::size_t N>
-std::array<Action, N> get_best_move(const FullGame<N>& game) {
+std::array<Action, N> get_best_move(const FullGame<N>& game, int player_idx) {
   Node root(game);
   auto duration = std::chrono::milliseconds(40);
+  
   auto start = std::chrono::steady_clock::now();
 
   int nb_it = 0;
   while (true) {
     Node<N>* node = select_and_expand(&root);
-    std::array<float, N> status = node->game.random_play_until_end().players_stats();
+   auto inter1_now = std::chrono::steady_clock::now();
+    auto inter1_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(inter1_now - start);
+
+        if (inter1_elapsed >= duration) {
+      cerr << "inter1 elaps " << inter1_elapsed.count() << " " << nb_it << endl;
+      //cerr << inter1_elapsed << " " << inter_elapsed << endl;
+      //break;
+	}
+
+	
+    //std::array<float, N> status = node->game.random_play_until_end().players_stats();
+    float status = node->game.random_play_until_end().eval_func(player_idx);
+    //float status = node->game.random_play_until_end().players_stats()[player_idx];
+    auto inter_now = std::chrono::steady_clock::now();
+    auto inter_elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(inter_now - start);
+
+    if (inter_elapsed >= duration) {
+      cerr << "inter elaps " << inter_elapsed.count() << " " << nb_it << endl;
+      //cerr << inter1_elapsed << " " << inter_elapsed << endl;
+      //break;
+	}
     backpropagate(node, status);
 
     ++nb_it;
@@ -1021,6 +1194,7 @@ std::array<Action, N> get_best_move(const FullGame<N>& game) {
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start);
     if (elapsed >= duration) {
       cerr << "Break at " << elapsed.count() << " " << nb_it << endl;
+      //cerr << inter1_elapsed << " " << inter_elapsed << endl;
       break;
     }
   }
@@ -1050,11 +1224,25 @@ int main()
     Roller<NP> rol;*/
     
     while (1) {
+      std::vector<std::vector<int>> scores;
         for (int i = 0; i < 3; i++) {
             string score_info;
             getline(cin, score_info);
+
+	    std::vector<int> numbers;
+	    std::istringstream iss(score_info);
+	    int number;
+
+	    // Lire les nombres depuis la chaîne et les stocker dans le vecteur
+	    while (iss >> number) {
+	      numbers.push_back(number);
+	    }
+	    assert(numbers.size() == 13);
+	    scores.push_back(numbers);
+	    
         }
 
+	cerr << scores[1][0] << endl;
 
 	vector<input_tuple> vit;
         for (int i = 0; i < nb_games; i++) {
@@ -1095,7 +1283,7 @@ int main()
 	      }
 	      }*/
         }
-	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3], all_actions_players );
+	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3], scores, all_actions_players );
 	// fg.print_game_state();
 	// cerr << "===========" << endl;
 	// auto tmp =  fg.random_play_until_end();
@@ -1106,7 +1294,7 @@ int main()
 	// }
 
 	//for (int i =0;i<100;++i) {
-	  auto bm = get_best_move<NP>(fg);
+	auto bm = get_best_move<NP>(fg,player_idx);
 	  cout << bm[player_idx] << endl;
 	  //}
 	//for (auto i:bm){
