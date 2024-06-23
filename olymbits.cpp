@@ -995,12 +995,20 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
   auto mr = ro.get_medals();
   auto md = di.get_medals();
 
+  for (int i = 0; i< N; ++i) {
+    ret_ar[0][i] = real_scores[i][1]*3 + real_scores[i][2];
+    ret_ar[1][i] = real_scores[i][4]*3 + real_scores[i][5];
+    ret_ar[2][i] = real_scores[i][7]*3 + real_scores[i][8];
+    ret_ar[3][i] = real_scores[i][10]*3 + real_scores[i][11];
+  }
+  
 
+  
 
   for (int i = 0; i< N; ++i) {
     if (mc[i] == 1) {ret_ar[0][i] += 3;}
     else if (mc[i] == 2) {ret_ar[0][i] += 1;}
-    else if (mc[i] == 3) {ret_ar[0][i] += -1;}
+    else if (mc[i] == 3) {ret_ar[0][i] += 0;}
     else {cerr << "HEE mc " << mc[i] << endl;}
 
     /*if (mc[i] == 1) {ret_ar[0][i] = 1;}
@@ -1010,30 +1018,44 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
     
     if (ma[i] == 1) {ret_ar[1][i] += 3;}
     else if (ma[i] == 2) {ret_ar[1][i] += 1;}
-    else if (ma[i] == 3) {ret_ar[1][i] += -1;}
+    else if (ma[i] == 3) {ret_ar[1][i] += 0;}
     else {cerr << "HEE ma " << ma[i] << endl;}
      
     if (mr[i] == 1) {ret_ar[2][i] += 3;}
     else if (mr[i] == 2) {ret_ar[2][i] += 1;}
-    else if (mr[i] == 3) {ret_ar[2][i] += -1;}
+    else if (mr[i] == 3) {ret_ar[2][i] += 0;}
     else {cerr << "HEE mr " << mr[i] << endl;}
     	    
     if (md[i] == 1) {ret_ar[3][i] += 3;}
     else if (md[i] == 2) {ret_ar[3][i] += 1;}
-    else if (md[i] == 3) {ret_ar[3][i] += -1;}
+    else if (md[i] == 3) {ret_ar[3][i] += 0;}
     else {cerr << "HEE md " << md[i] << endl;}
+    
   }
 
   for (int j=0;j<N;++j) {
-    float mult = 1.0;
+    float mult = 1.0;//1.0;
     for (int i = 0; i< 4; ++i) {
-      if (i==3) {continue;}
+      //if (i==3) {continue;}
       mult *= ret_ar[i][j];
     }
     ret_ar_final[j] = mult;
     
   }
+
+
+  auto ordered_a = rank_numbers(ret_ar_final);
   
+  std::array<float, N> ret_ar_final_final = {};
+
+
+  for(int i=0;i<N;++i) {
+    if (ordered_a[i] == 1) {ret_ar_final_final[i] = 1;}
+    else if (ordered_a[i] == 2) {ret_ar_final_final[i] = 0;}
+    else if (ordered_a[i] == 3) {ret_ar_final_final[i] = -1;}
+    else {cerr << "HEE mc 22 " << mc[i] << endl;}
+  }
+  return ret_ar_final_final;
   /*   for (int i = 0; i< N; ++i) {
     if (mc[i] == 1) {ret_ar[i] += 1;}
     else if (mc[i] == 2) {ret_ar[i] += 0.5;}
@@ -1057,6 +1079,7 @@ const std::array<float, N> FullGame<N>:: players_stats() const{
     }*/
 
   //return ret_ar[0];
+  return ret_ar_final;
   
   bool ret_only_di = true;
   for (int player_idx = 0; player_idx< N; ++player_idx) {
@@ -1111,13 +1134,29 @@ FullGame<N> FullGame<N>::action(const std::array<Action, N>& actions) const {
   auto nco = co.action(actions);
   auto nar = ar.action(actions);
   auto nro = ro.action(actions);
-  auto ndi = di.action(actions);
+
 
   FullGame fg = *this;
   fg.co = nco;
   fg.ar = nar;
   fg.ro = nro;
+
+  auto ndi = di.action(actions);
   fg.di = ndi;
+    
+  /*   bool ret_only_di = true;
+  for (int player_idx = 0; player_idx< N; ++player_idx) {
+    if ((real_scores[player_idx][10] == 0) && (real_scores[player_idx][11] == 0)) {
+      ret_only_di = ret_only_di & true;
+    }
+    else {ret_only_di = false;}
+  }
+  if (ret_only_di) {
+    auto ndi = di.action(actions);
+    fg.di = ndi;
+  } else {
+    fg.di.is_finish = true;
+    }*/
 
   return fg;
 }
@@ -1258,11 +1297,11 @@ Action best_node(const Node<N>& root, int curr_play) {
     /*auto cmp = [=](const std::unique_ptr<Node<N>> & n1, const std::unique_ptr<Node<N>> & n2)
       { return n1->n_sims[curr_play] < n2->n_sims[curr_play]; };
     */
-      auto cmp = [=](const std::unique_ptr<Node<N>> & n1, const std::unique_ptr<Node<N>> & n2)
+    /*     auto cmp = [=](const std::unique_ptr<Node<N>> & n1, const std::unique_ptr<Node<N>> & n2)
       { return n1->rewards[curr_play] < n2->rewards[curr_play]; };
     auto iter = std::max_element(cs.begin(), cs.end(), cmp);
     auto idx = std::distance(cs.begin(), iter);
-    cerr << "here "<< idx <<  endl;
+    cerr << "here "<< idx <<  endl;*/
 
     /*  for (int i=0;i<cs.size();++i) {
       cerr << cs[i]->n_sims[curr_play] << " " << cs[i]->rewards[curr_play] << " " <<root.game.poss_actions[i][0]<<' ' <<root.game.poss_actions[i][1]<<' ' <<root.game.poss_actions[i][2] << endl;
@@ -1314,9 +1353,9 @@ Action best_node(const Node<N>& root, int curr_play) {
         return p1.second < p2.second; });
 
 
-    for(auto mv:m){
+    /*for(auto mv:m){
       cerr << mv.first << " " << mv.second << endl;
-    }
+      }*/
     
     //return root.game.poss_actions[max_i];
     return x.first;
@@ -1325,7 +1364,7 @@ Action best_node(const Node<N>& root, int curr_play) {
 template <std::size_t N>
 Action get_best_move(const FullGame<N>& game, int player_idx) {
   Node root(game);
-  auto duration = std::chrono::milliseconds(45);
+  auto duration = std::chrono::milliseconds(42);
   
   auto start = std::chrono::steady_clock::now();
 
@@ -1430,7 +1469,7 @@ int main()
 	      }*/
         }
 	FullGame<NP> fg(vit[0],vit[1],vit[2],vit[3], scores, all_actions_players );
-	cerr << "STT" << fg.eval_func(player_idx) << endl;
+	//cerr << "STT" << fg.eval_func(player_idx) << endl;
 	// fg.print_game_state();
 	// cerr << "===========" << endl;
 	// auto tmp =  fg.random_play_until_end();
